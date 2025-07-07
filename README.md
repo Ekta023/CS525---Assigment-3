@@ -1,123 +1,92 @@
-# Record Manager Implementation (CS525 - Assignment 3)
+# Record Manager – CS525 Assignment 3
 
-This **Record Manager** is a simple system for handling fixed-length records on disk, using a previously developed **Buffer Manager** and **Storage Manager**. The code conforms to the interfaces specified in the assignment (`record_mgr.h`, `buffer_mgr.h`, `storage_mgr.h`, etc.). It allows creating tables, inserting/deleting/updating records, scanning with conditions, and retrieving data by record ID.
-
----
-
-## Table of Contents
-1. [Project Structure](#project-structure)
-2. [Key Files](#key-files)
-3. [Build & Run](#build--run)
-4. [Testing](#testing)
-5. [Implementation Details](#implementation-details)
-
+This Record Manager is a system designed to manage fixed-length records stored on disk. It builds on components from earlier assignments, including the Buffer Manager and Storage Manager, and adheres to the required interfaces (record_mgr.h, buffer_mgr.h, storage_mgr.h, etc.). The system supports core functionality such as creating tables, inserting/updating/deleting records, scanning with conditions, and retrieving records using their IDs.
 
 ---
 
 ## Project Structure
 
-A typical folder layout:
-📁 assign3  
-├── Makefile // Optional: For automating builds
-├── buffer_mgr.c 
-├── buffer_mgr.h 
-├── dberror.c 
-├── dberror.h 
-├── dt.h 
-├── expr.c 
-├── expr.h 
-├── record_mgr.c 
-├── record_mgr.h 
-├── rm_serializer.c 
-├── rm_serializer.h // (if needed) 
-├── storage_mgr.c 
-├── storage_mgr.h 
-├── tables.h 
-├── test_assign3_1.c // Main assignment tests (has main()) 
-├── test_expr.c // Expression tests (also has main()) 
-├── test_helper.h // Helper macros/functions for testing 
-└── README.md // This README
+Directory overview:
+assign3/
+├── Makefile              # Optional: for automating compilation
+├── buffer_mgr.c/h        # Buffer management code
+├── dberror.c/h           # Error reporting
+├── dt.h                  # Data types
+├── expr.c/h              # Expression evaluation engine
+├── record_mgr.c/h        # Core Record Manager implementation
+├── rm_serializer.c/h     # (Optional) Serialization helpers
+├── storage_mgr.c/h       # Disk page operations
+├── tables.h              # Table and schema definitions
+├── test_assign3_1.c      # Main Record Manager test suite
+├── test_expr.c           # Expression evaluation tests
+├── test_helper.h         # Testing macros/utilities
+└── README.md             # This file
 
-
-- **`record_mgr.c/.h`**: The core Record Manager code (table creation, record insert/delete, scanning).
-- **`buffer_mgr.c/.h`**: The Buffer Manager from a previous assignment.
-- **`storage_mgr.c/.h`**: The Storage Manager from assignment 1 (reading/writing disk blocks).
-- **`expr.c/.h`**: Expression evaluation code used for scanning conditions.
-- **`rm_serializer.c`**: Helper functions for serializing table/record data (optional).
-- **`test_assign3_1.c`**: Main test suite for the Record Manager (inserts, updates, scans).
-- **`test_expr.c`**: Tests specifically for the expression framework.
-
----
-
-## Key Files
-
-1. **`record_mgr.c`**  
-   Implements the public API declared in `record_mgr.h`. Key functionality includes:
-   - `createTable`, `openTable`, `closeTable`, `deleteTable`
-   - `insertRecord`, `deleteRecord`, `updateRecord`, `getRecord`
-   - `startScan`, `next`, `closeScan`
-   - Helper methods for record/schema management
-
-2. **`expr.c`**  
-   Provides logic for evaluating expressions (e.g., boolean and comparison operators). The Record Manager’s `scan` uses these to filter results.
-
-3. **`buffer_mgr.c`** (from previous assignment)  
-   Provides page caching and page replacement strategies. The Record Manager pins/unpins pages via this buffer manager.
-
-4. **`test_assign3_1.c`**  
-   The main assignment test suite. Defines `main()` with various sub-tests:
-   - Creating a table and inserting data
-   - Updating/deleting records
-   - Scanning with conditions
-   - Verifying data integrity
-
-5. **`test_expr.c`**  
-   Tests expression logic separately, also defines `main()`. Must be compiled into a separate executable than the main assignment test.
+### Key Files:
+- record_mgr.c/h: Implements main record operations and manages metadata and scans.
+- expr.c/h: Provides expression handling for filtering during scans.
+- buffer_mgr.c/h: Manages page caching and replacement strategies.
+- storage_mgr.c/h: Performs low-level file and page I/O.
+- test_assign3_1.c: Validates key Record Manager functionalities.
+- test_expr.c: Dedicated test suite for evaluating expressions.
 
 ---
 
 ## Build & Run
-```
+
+Compile and run using the following commands:
 make clean
 make
-./test_assign3
-./test_expr
-```
+./test_assign3    # Runs Record Manager tests
+./test_expr       # Runs expression tests
 
-# Implementation Details
+---
 
-## Table Metadata
-- Stored on **page 0** (the “header page”).
-- Contains important information such as:
-  - `numTuples`: Total number of records in the table.
-  - `recordSize`: Size of each record.
-  - `slotsPerPage`: Number of slots available per page.
-- May include **serialized schema data** for attribute definitions.
+## Implementation Overview
 
-## Data Pages
-- **Start from page 1** onward, storing **fixed-length records**.
-- Uses a **slot-based layout**:
-  - **Bitmap or array** tracks free and occupied slots.
-  - Efficient space management for inserting and deleting records.
+### Table Metadata
+- Stored in page 0 (header page).
+- Includes:
+  - numTuples: Total number of stored records.
+  - recordSize: Size of each record.
+  - slotsPerPage: Number of records each page can hold.
+  - May also store serialized schema information.
 
-## Buffer Manager
-- **Handles all page reads/writes** via the following functions:
-  - `pinPage()`: Loads a page into memory.
-  - `unpinPage()`: Releases a page when done.
-  - `markDirty()`: Marks a page for writing back to disk.
-  - `forceFlushPool()`: Writes dirty pages to disk.
+### Record Storage (Data Pages)
+- Records begin from page 1 onward.
+- Uses a slot-based storage format with a bitmap or similar method to track free and used slots.
+- Ensures efficient space utilization and quick access.
 
-## Scanning (startScan, next, closeScan)
-- A **ScanManager struct** keeps track of:
-  - Current **page** and **slot**.
-  - **Scan condition** for filtering records.
-- Uses `evalExpr()` (from `expr.c`) to evaluate if a record **matches** the condition.
+### Buffer Manager Integration
+- All data page operations are routed through the Buffer Manager:
+  - pinPage() to bring a page into memory.
+  - unpinPage() to release it when done.
+  - markDirty() to mark changes.
+  - forceFlushPool() to persist updates to disk.
 
-## Expressions
-- Expression evaluation is handled in `evalExpr()`, specifically in the **`EXPR_OP` case**.
-- Recent fixes ensure that:
-  - `Value *result` is **always allocated** before calling functions like:
-    - `boolAnd()`
+### Record Scanning
+- Managed via a ScanManager structure, which tracks:
+  - Current page and slot being scanned.
+  - Filtering conditions using expressions.
+- Filtering logic uses the evalExpr() function to determine if a record meets a given condition.
+
+### Expression Evaluation
+- Found in expr.c, primarily under the EXPR_OP logic in evalExpr().
+- Ensures the Value *result is always properly initialized before applying operations like boolAnd().
+
+---
+
+## Testing
+
+- Run ./test_assign3 to validate:
+  - Table creation and record insertion.
+  - Updates and deletions.
+  - Scanning with various conditions and schema correctness.
+
+- Run ./test_expr to check:
+  - Expression parsing.
+  - Evaluation logic and boolean comparisons.
+
     - `valueEquals()`
     - `boolOr()`
   - Prevents segmentation faults by ensuring `result` is not NULL before use.
